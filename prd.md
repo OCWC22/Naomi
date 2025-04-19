@@ -1,147 +1,78 @@
-PRD: Relationship Text Debug (Hackathon Draft v2)
-1. Introduction & Goal
-This document outlines the requirements for the "Relationship Text Debug" service, a hackathon project. The goal is to build a tool that helps users analyze recent WhatsApp conversations to understand arguments, identify negative communication patterns, and draft healthier responses with AI assistance. The primary technology will be Google's Agent Development Kit (ADK), supported by a RAG architecture using Pinecone, Supabase, and Gemini.
-2. Target Audience
+# PRD: Relationship Text Debug (Hackathon MVP v4 - WhatsApp MCP & Mem0)
+
+## 1. Introduction & Goal
+
+This document outlines the requirements for the "Relationship Text Debug" service, a **hackathon MVP**. The goal is to build a **minimal viable tool** that allows users to interact via commands sent to an **MCP server**, which in turn interacts with their **personal WhatsApp account** via an **unofficial bridge**. The system will use two core agents (Conversation Debugger, Response Drafter) sharing context via **Mem0** and retrieving relevant information using **Pinecone**. A simple **web client display** shows results.
+
+**Architecture:** This relies on a two-component system:
+1.  **Go WhatsApp Bridge:** Connects to the user's personal WhatsApp account using the `whatsmeow` library (unofficial WhatsApp Web API), handles QR code auth, stores messages locally (e.g., SQLite), and exposes an API for the Python server.
+2.  **Python MCP Server (FastAPI):** Implements MCP tools, orchestrates agents, interacts with Mem0/Pinecone, and communicates with the Go bridge to send/receive WhatsApp messages.
+
+**Disclaimer:** This approach uses unofficial libraries (`whatsmeow`) to interact with WhatsApp Web, which is inherently unstable, prone to breaking, and may violate WhatsApp's Terms of Service.
+
+**Sources:**
+*   WhatsApp Interaction Library: [whatsmeow (unofficial)](https://github.com/tulir/whatsmeow)
+*   Reference MCP Implementation: [lharries/whatsapp-mcp](https://github.com/lharries/whatsapp-mcp)
+*   Pinecone: [https://docs.pinecone.io/guides/get-started/quickstart](https://docs.pinecone.io/guides/get-started/quickstart), [https://docs.pinecone.io/assistant-release-notes/2025](https://docs.pinecone.io/assistant-release-notes/2025) (Accessed April 2025)
+*   Mem0: [https://github.com/mem0ai/mem0](https://github.com/mem0ai/mem0), [https://docs.ag2.ai/docs/ecosystem/mem0/](https://docs.ag2.ai/docs/ecosystem/mem0/) (Accessed April 2025)
+
+## 2. Target Audience
+
 Primarily couples aged 25-40 experiencing communication challenges in text-based arguments (specifically WhatsApp).
 
-
-3. Key Features
-3.1 Account Management
-User Registration/Login: Simple email/password or social login, managed via Supabase Auth.
-
-
-WhatsApp Linking: Users can link their WhatsApp account via a standard QR code method. Backend securely stores necessary credentials/tokens (in Supabase) for the linked device.
-
-
-3.2 Conversation Debug Setup
-Conversation Selection: UI allows users to choose a specific WhatsApp conversation they wish to analyze.
-
-
-Message Retrieval: Backend fetches a recent segment of the selected conversation (e.g., last 24 hours) to provide context.
-
-
-3.3 Conversation Debug & Response Assistance
-AI Analysis (Optional): User can trigger analysis. An ArgumentAnalyzerAgent (ADK) processes the conversation transcript, potentially referencing the RAG knowledge base (via Pinecone) for communication patterns.
-
-
-AI-Powered Discussion:
-
-
-A chat interface where the user discusses the argument with a primary coordination agent (ADK).
-
-
-The agent uses the conversation transcript and potentially output from the ArgumentAnalyzerAgent as context.
-
-
-Prioritizes understanding the user's perspective and desired outcome.
-
-
-Presents identified patterns non-judgmentally, possibly informed by RAG context on healthy communication.
-
-
-Response Drafting:
-
-
-Interface for drafting a response.
-
-
-User can ask for AI assistance. A ResponseStylistAgent (ADK) helps draft or refine the response, considering the user's goals and referencing the RAG knowledge base for effective communication techniques.
-
-
-AI-generated first drafts are offered only when the user's intent is clear.
-
-
-3.4 Backend
-WhatsApp Integration: Mechanism to retrieve messages from the linked WhatsApp account.
-
-
-Data Storage: Supabase used for storing user accounts, linked device info, and potentially message snippets/analysis results temporarily.
-
-
-Vector Database: Pinecone used to store vector embeddings of knowledge base documents.
-
-
-Knowledge Base Management: Simple mechanism (potentially manual script for hackathon) to process uploaded .txt or .md files, generate embeddings using the Gemini embedding model, and store them in Pinecone.
-
-
-3.5 AI Agents (Built with ADK)
-Leverage Google ADK framework to build multiple, specialized agents.
-
-
-Key Agents (Examples):
-ConversationDebugAgent (LlmAgent):
-Purpose: To analyze the provided WhatsApp conversation transcript and identify potential communication issues. This agent acts as the primary analytical engine for understanding the argument dynamics.
-Core Functionalities (using LLM reasoning, potentially guided by RAG):
-Identify Accusations: Detect language that assigns blame or fault (e.g., "You always...", "You never...").
-Spot Unaddressed Concerns: Recognize points or questions raised by one party that are ignored or deflected by the other.
-Analyze Negativity/Sentiment: Assess the overall tone and identify specific instances or patterns of negativity, criticism, contempt, or defensiveness, potentially focusing on specific topics if relevant patterns emerge.
-Implementation: Built using ADK's LlmAgent class, allowing it to leverage a large language model (like Gemini) for natural language understanding and reasoning25. It will receive the conversation transcript as input.
-RAG Interaction: Queries the Pinecone vector database to retrieve relevant concepts about communication pitfalls, common argument patterns (like Gottman's Four Horsemen), and conflict styles to inform its analysis and provide contextually grounded insights.
-ResponseDrafterAgent (LlmAgent):
-Purpose: To assist the user in formulating a constructive and effective response based on the analysis and the user's stated goals.
-Core Functionalities:
-Goal Alignment: Takes input from the user (via the chat interface) about their desired outcome (e.g., de-escalate, clarify understanding, apologize, set a boundary).
-Draft Generation: Creates potential response drafts aiming for a healthier communication style (e.g., using "I" statements, expressing empathy, suggesting concrete next steps).
-Refinement: Can revise drafts based on user feedback.
-Implementation: Also likely an LlmAgent25, receiving the conversation context, the ConversationDebugAgent's analysis (optionally), and the user's explicit drafting requests/goals as input.
-RAG Interaction: Queries the Pinecone RAG store for best practices in constructive communication, examples of effective phrasing for apologies, boundary setting, expressing needs, etc., relevant to the user's specific situation and goals.
-RAG Integration:
-Both the ConversationDebugAgent and ResponseDrafterAgent will be equipped to interact with the RAG system as a specialized tool35.
-When triggered, the agent formulates a query based on its current task (e.g., "Identify signs of stonewalling in this exchange," or "Provide examples of empathetic responses to criticism").
-This query is used to perform a vector similarity search against the Gemini embeddings stored in the Pinecone database61015.
-The relevant text chunks retrieved from the .txt/.md knowledge files (hosted in Supabase storage, indexed in Pinecone) are returned to the agent.
-The agent incorporates this retrieved knowledge into its analysis or response generation process, grounding its output in the established knowledge base614. This helps reduce hallucination and increases the relevance and accuracy of the AI's assistance6.
-
-
-4. Technology Stack
-Core Framework: Google Agent Development Kit (ADK).
-
-
-Language: Python.
-
-
-LLM Integration: Integrate with a suitable Large Language Model (e.g., Gemini series via ADK) for core reasoning/generation.
-
-
-Embeddings: Gemini Embedding Model.
-
-
-Vector Database: Pinecone.
-
-
-Data Storage / Backend: Supabase (PostgreSQL database, Auth, potentially edge functions).
-
-
-UI: Basic web framework (e.g., Flask/FastAPI with simple HTML/CSS/JS, or Streamlit).
-
-
-5. UI/UX Considerations
-(No changes from the previous version - focus remains on simplicity, clarity, and supportive interaction)
-Simplicity and Clarity: Minimal, clean, intuitive UI.
-
-
-Target Audience Fit: Supportive, calm, non-judgmental aesthetic.
-
-
-Key Screens/Pages (Hackathon Scope):
-
-
-Login/Registration (using Supabase Auth).
-
-
-Dashboard/Conversation List & WhatsApp Linking Button.
-
-
-WhatsApp Linking Page/Modal.
-
-
-Debug View (Conversation, AI Chat, Response Draft Area).
-
-
-Navigation: Straightforward.
-
-
-Onboarding: Minimal.
-
-
-Intuitiveness: Clear language, logical flow.
+## 3. Core MVP Features
+
+Focus on the absolute minimum required to demonstrate the concept via MCP interactions controlling personal WhatsApp.
+
+*   **WhatsApp Connection & Interaction (via MCP Server & Go Bridge):**
+    *   User connects their personal WhatsApp account to the **Go Bridge** via **QR code scan**.
+    *   Users (or an integrated agent/tool) interact by calling **MCP tool endpoints** on the **Python MCP Server** (e.g., `/mcp/search_messages`, `/mcp/send_message`).
+    *   The Python server translates MCP calls into requests to the **Go Bridge API**.
+    *   The Go Bridge uses `whatsmeow` to perform actions (read/send messages) on the user's linked WhatsApp account.
+    *   The linked WhatsApp session ID (managed by the Go Bridge) serves as the user identifier for Mem0/Pinecone.
+
+*   **Web Client Display (Controlled via Backend):**
+    *   A **very basic, read-only web page** displaying:
+        *   Conversation snippets retrieved via MCP calls.
+        *   Key insights from the `ConversationDebugAgent`.
+        *   Drafted responses from the `ResponseDrafterAgent`.
+    *   Updates to this display are **triggered by backend actions** resulting from MCP tool usage or agent processing. *The user does not interact directly with this display in the MVP.*
+
+*   **Agent-Driven Analysis & Drafting (Triggered via MCP):**
+    *   `ConversationDebugAgent`:
+        *   Triggered by an internal call or an MCP tool invocation.
+        *   Retrieves specified recent conversation context by calling the Go Bridge (via the Python server's MCP interface) and uses **Mem0**/**Pinecone**.
+        *   Performs simplified analysis.
+        *   Stores analysis summary in **Mem0** for the `ResponseDrafterAgent`.
+        *   Updates the Web Client Display via the backend.
+    *   `ResponseDrafterAgent`:
+        *   Triggered by an internal call or MCP tool invocation.
+        *   Uses context from **Mem0**/**Pinecone** and potentially the Go Bridge (via MCP) to draft response options.
+        *   Sends drafted responses back to the user's WhatsApp by calling the `send_message` MCP tool (Python Server -> Go Bridge -> WhatsApp).
+        *   Updates the Web Client Display via the backend.
+
+*   **Shared Memory & Context Retrieval:**
+    *   **Mem0:** Stores recent conversation history, agent analysis summaries, etc., within the session scope, shared between agents. Keyed by the Go Bridge's session identifier. [Ref: Mem0 Docs]
+    *   **Pinecone:** Stores vector embeddings of conversation segments for semantic retrieval. [Ref: Pinecone Docs]
+    *   **Go Bridge Storage (e.g., SQLite):** The Go bridge maintains its own local storage of message history retrieved via `whatsmeow`.
+
+## 4. Technology Stack (MVP)
+
+*   **WhatsApp Interaction:** Go WhatsApp Bridge using `whatsmeow` (unofficial library).
+*   **Backend Interface:** Python MCP Server (FastAPI) providing MCP tool endpoints.
+*   **Bridge <-> Server Communication:** API defined between Go bridge and Python server (e.g., REST, gRPC).
+*   **Bridge Storage:** SQLite (or similar, managed by Go bridge).
+*   **Vector Database:** Pinecone (using Python SDK v6.0.0+) [Ref: Pinecone Docs]
+*   **Agent Memory:** Mem0 Python library [Ref: Mem0 Docs]
+*   **Languages:** Go (for bridge), Python (for MCP server/agents).
+*   **Web Client Display:** Basic HTML/CSS/JS.
+
+## 5. Simplified Architecture
+
+WhatsApp User <-> WhatsApp Web API <-> **Go Bridge** (`whatsmeow`, SQLite, Bridge API) <-> **Python MCP Server** (FastAPI, MCP Tools, Mem0, Pinecone, Agent Logic) -> Web Client Display
+
+## 6. UI/UX Considerations (MVP)
+
+*   **Primary Setup:** User scans a QR code generated by the Go Bridge to link their WhatsApp.
+*   **Primary Interaction:** Happens via tools/agents calling the Python MCP Server endpoints. *Direct user interaction model for MVP TBD* (e.g., Could be a separate CLI tool, a simple web UI calling MCP endpoints, or agents acting autonomously based on incoming messages detected by the bridge).
+*   **Web Client:** Serves purely as a **passive visual aid**. Extremely simple, read-only.
