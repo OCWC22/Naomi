@@ -20,6 +20,18 @@ def get_whatsapp_conversation(person_name: str) -> dict:
                 ["10:34 AM", "Wife", "You never took it out"],
             ]
         }
+    elif person_name.lower() == "girlfriend":
+        return {
+            "status": "success",
+            "history": [
+                ["10:00 PM", "girlfriend", "Did you see my text from earlier about wanting to talk?"],
+                ["10:05 PM", "You", "Yeah, busy day. What's up?"],
+                ["10:07 PM", "girlfriend", "Just 'what's up'? I said I needed to talk, it felt important. You didn't respond for hours."],
+                ["10:09 PM", "You", "I literally said I was busy. Can't it wait until I'm not swamped?"],
+                ["10:11 PM", "girlfriend", "It always feels like it can wait. Like I'm not a priority unless it's convenient for you."],
+                ["10:13 PM", "You", "Wow, okay. Turning this into a whole thing? I was just working."]
+            ]
+        }
     return {
         "status": "error",
         "error_message": "Sorry, I don't have access to your WhatsApp messages.",
