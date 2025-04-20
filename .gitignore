@@ -22,3 +22,6 @@ env/
 node_modules/
 whatsapp_integration/mcp_server_node/wweb_session/
 whatsapp_integration/mcp_server_node/.env
+
+# WhatsApp Web JS Cache
+whatsapp_integration/mcp_server_node/.wwebjs_cache/
