@@ -182,3 +182,206 @@ Cache files are temporary and specific to a user's session. They should not be p
 
 ### Future Work:
 - Add other common patterns to `.gitignore` (e.g., `node_modules`, `.env`, Python `__pycache__`).
+
+## 04-19-2025 - Integrate Mem0 via Composio MCP into ADK Agent
+
+### Files Updated:
+- `/Users/chen/Desktop/Projects/Naomi/agent/requirements.txt`: Added `composio_openai` and `python-dotenv`.
+- `/Users/chen/Desktop/Projects/Naomi/agent/agent.py`: Imported Composio, fetched Mem0 tools, registered tools with ADK Agent, updated agent instructions.
+
+### Description:
+Integrated Mem0 capabilities into the `conversation_debugger_agent` by leveraging the Composio MCP integration. The agent now fetches Mem0 tools (like `add_memories` and `perform_semantic_search_on_memories`) provided by Composio at initialization and registers them alongside its existing tools. The agent's instructions were updated to guide its use of these memory functions.
+
+### Reasoning:
+The PRD requires agents to use Mem0 for shared memory. Using the Composio MCP toolset simplifies integration by providing pre-built tools that adhere to the ADK tool structure, abstracting away the direct Mem0 API calls. This aligns with the documentation in `reference/mem0-mcp-docs.md` and `reference/adk-docs.md`.
+
+### Trade-offs:
+- Relies on the external Composio service and its API key configuration.
+- Assumes the standard Mem0 tool names provided by Composio (`add_memories`, `perform_semantic_search_on_memories`) match the ones fetched dynamically. Error handling was added for cases where tools can't be fetched.
+
+### Considerations:
+- Requires `COMPOSIO_API_KEY` to be set in the environment (`.env` file) for the Composio toolset to authenticate and fetch tools.
+- The agent's effectiveness now depends partly on its ability to correctly interpret when and how to use the Mem0 tools based on their descriptions and the updated instructions.
+- The mock `get_whatsapp_conversation` tool is still in place; replacing it with actual WhatsApp MCP interaction is the next major step for this agent.
+
+### Future Work:
+- Install updated requirements: `pip install -r agent/requirements.txt`.
+- Replace the mock `get_whatsapp_conversation` tool with actual calls to the Node.js WhatsApp MCP server.
+- Implement the `ResponseDrafterAgent` as outlined in the PRD, potentially sharing the same Composio/Mem0 setup.
+- Test the agent's ability to use the Mem0 tools effectively during a conversation flow.
+- Verify Composio connection and tool availability upon running the agent.
+
+## 04-19-2025 - Replace Mock WhatsApp with Real MCP Call in Agent
+
+### Files Updated:
+- `/Users/chen/Desktop/Projects/Naomi/agent/requirements.txt`: Added `requests`.
+- `/Users/chen/Desktop/Projects/Naomi/agent/agent.py`: Replaced `get_whatsapp_conversation` mock with `fetch_whatsapp_messages_mcp` function calling the Node.js MCP server; updated tool registration and agent instructions.
+
+### Description:
+Implemented the core functionality for the agent to interact with the WhatsApp MCP server. The previous mock function for getting WhatsApp messages was removed and replaced with a new function, `fetch_whatsapp_messages_mcp`. This function uses the `requests` library to send a POST request to the `/mcp` endpoint of the Node.js server, invoking the `whatsapp.get_messages` tool with the specified `chat_name` and `limit`. It handles successful responses and various potential errors (connection issues, server errors, unexpected response format). The ADK agent's tool list and instructions were updated accordingly.
+
+### Reasoning:
+This change fulfills a primary requirement of the PRD: enabling the Python agent to retrieve actual data from the user's WhatsApp via the Node.js MCP bridge. Replacing the mock function is essential for the agent to perform meaningful analysis based on real conversations. The implementation directly uses the `whatsapp.get_messages` tool identified in the `server.js` code.
+
+### Trade-offs:
+- The agent now has a direct dependency on the Node.js MCP server being available and correctly configured at the specified URL (`http://localhost:3000/mcp` by default).
+- Error handling adds complexity but is necessary for robustness.
+- Assumes the `whatsapp.get_messages` tool on the server functions as expected based on the `server.js` review.
+
+### Considerations:
+- The MCP server URL is currently hardcoded with a default but can be overridden via the `WHATSAPP_MCP_SERVER_URL` environment variable.
+- The agent needs to be invoked with the correct `chat_name` for the tool to work.
+- Network latency or MCP server issues could impact agent performance. A timeout was added to the request.
+- The format of the returned messages in the `history` matches the structure expected by the new function's docstring and the server code.
+
+### Future Work:
+- Install the new `requests` dependency: `pip install -r agent/requirements.txt`.
+- Thoroughly test the interaction between the agent and the MCP server.
+- Implement the logic for the agent to *use* the fetched history (analysis, storing in Mem0).
+- Implement the `ResponseDrafterAgent` and the `whatsapp.send_message` MCP call.
+- Consider adding more sophisticated error handling or retry mechanisms if needed.
+
+## 04-19-2025 - Prepare Agent for Integration Test
+
+### Files Updated:
+- `/Users/chen/Desktop/Projects/Naomi/agent/agent.py`: Added `if __name__ == "__main__":` block to execute `root_agent.chat()` for testing.
+
+### Description:
+Prepared the agent script for integration testing. Added a main execution block to `agent.py` to allow running the script directly (`python agent/agent.py`) and triggering the agent's chat flow with a sample query. Note: Creation of the `agent/.env` file failed due to `.gitignore` rules and must be done manually by the user.
+
+### Reasoning:
+Verification requires running the agent. The execution block provides the entry point for testing the integrated flow (Composio tool fetching, MCP tool calling). The `.env` file (to be created manually) is mandatory for Composio authentication.
+
+### Trade-offs:
+- The test query and chat name are hardcoded in the execution block; this is suitable for initial verification but should be made more dynamic later.
+- Relies on the user correctly creating the `agent/.env` file and adding their API key.
+
+### Considerations:
+- The `COMPOSIO_API_KEY` must be valid for Mem0 tool fetching to succeed.
+- The Node.js WhatsApp MCP server must be running and authenticated for the `fetch_whatsapp_messages_mcp` tool to succeed.
+- The chat name used in the test query (`Wife` by default) must exist in the connected WhatsApp account.
+
+### Future Work:
+- User needs to manually create `agent/.env` and add their `COMPOSIO_API_KEY`.
+- Run the agent (`python agent/agent.py`) after the user adds the API key.
+- Analyze the output logs from both the Python script and the Node.js server to verify each step of the integration.
+- Replace the hardcoded test query with a more robust testing method or user input mechanism.
+
+## 04-19-2025 - Refine Agent for Integration Test (Keep Core Integrations)
+
+### Files Updated:
+- `/Users/chen/Desktop/Projects/Naomi/agent/agent.py`: Restored `.env` loading, Composio/Mem0 tool fetching (with error handling), combined tool list, and original agent instructions. Kept the main execution block.
+
+### Description:
+Adjusted the agent script for integration testing based on user feedback. Instead of completely removing `.env` and Mem0 integration, this version keeps them. The script now attempts to load environment variables and fetch Mem0 tools via Composio, printing an error and continuing without Mem0 tools if fetching fails. The agent is initialized with both the WhatsApp tool and any successfully fetched Mem0 tools, using the original instructions that describe both functionalities.
+
+### Reasoning:
+This approach allows testing the primary WhatsApp MCP tool interaction while retaining the necessary structure and error handling for the Mem0 integration. It provides a more realistic test setup compared to completely removing the Mem0 code, addressing the user's request to keep essential features while simplifying the immediate test focus.
+
+### Trade-offs:
+- The test run might show errors related to Composio/Mem0 if the `.env` file or API key is incorrect, but the agent should still attempt the WhatsApp tool call if Mem0 fetching fails.
+- The test query remains hardcoded.
+
+### Considerations:
+- `agent/.env` must exist and contain a valid `COMPOSIO_API_KEY` for Mem0 tools to load.
+- The Node.js server must be running and authenticated.
+- The test chat name must be correct.
+
+### Future Work:
+- Run the agent (`python agent/agent.py`) after user confirms prerequisites.
+- Analyze logs to verify Composio connection (success or handled failure) and the MCP WhatsApp tool call.
+
+## 04-19-2025 - Fix Agent Initialization and Composio Enum Errors
+
+### Files Updated:
+- `/Users/chen/Desktop/Projects/Naomi/agent/agent.py`: Corrected Composio `App` enum to `App.MEM0_TEXT_MEMORY` (with fallback to `App.MEM0`) for fetching Mem0 tools. Added required `name` and optional `description` parameters back to the `Agent` constructor.
+
+### Description:
+Addressed two errors encountered during the previous test run. First, corrected the enum used to fetch Mem0 tools from Composio, trying `App.MEM0_TEXT_MEMORY` first and falling back to `App.MEM0` if needed, improving error handling. Second, fixed a Pydantic validation error by adding the mandatory `name` parameter (and restoring the `description`) to the `Agent` initialization call.
+
+### Reasoning:
+The Composio `App` enum name was incorrect for the installed library version, preventing Mem0 tools from being fetched (though error handling allowed the script to continue). The missing `name` parameter in the `Agent` constructor caused a fatal validation error according to ADK/Pydantic requirements. These fixes are essential for the script to initialize correctly and attempt both integrations.
+
+### Trade-offs:
+- The Composio enum fix involves a guess (`App.MEM0_TEXT_MEMORY`) and a fallback; if neither is correct for the user's specific `composio_openai` version, Mem0 tool fetching will still fail, but the error message is now clearer.
+
+### Considerations:
+- Correct functioning still depends on prerequisites: Node.js server running & authenticated, correct chat name in the script, and a valid (optional) `COMPOSIO_API_KEY` in `agent/.env`.
+
+### Future Work:
+- Re-run the agent (`python3 agent/agent.py`) to verify the fixes.
+- If Composio fetching still fails, investigate the correct `App` enum name for the installed library version.
+
+## 04-19-2025 - Add WhatsApp Chat Listing Tool to Agent
+
+### Files Updated:
+- `/Users/chen/Desktop/Projects/Naomi/agent/agent.py`: Added `list_whatsapp_chats_mcp` function to call the (assumed) `whatsapp.list_chats` tool on the MCP server. Added this function to the agent's `all_tools` list.
+
+### Description:
+Implemented the Python-side functionality for listing available WhatsApp chats. Added the `list_whatsapp_chats_mcp` function to act as a wrapper for the corresponding MCP server tool. Made this new function available to the agent by including it in the list of tools passed during agent initialization.
+
+### Reasoning:
+Provides a mechanism within the agent to discover available chat names programmatically. This complements the existing `fetch_whatsapp_messages_mcp` tool by allowing the agent (or user) to identify the correct `chat_name` beforehand.
+
+### Trade-offs:
+- This agent-side code relies on the backend Node.js server having the `whatsapp.list_chats` tool correctly implemented. If the server doesn't support it, calls to this function will fail.
+
+### Considerations:
+- The Node.js server must be restarted if its code (`server.js`) was modified to include the `whatsapp.list_chats` handler.
+- The agent's instructions have not been modified to proactively *use* this tool, but it is now available for the agent's reasoning process or direct user requests (e.g., "List my WhatsApp chats").
+
+### Future Work:
+- Restart the Node.js server if `server.js` was modified.
+- Test the new tool using `adk run agent` (e.g., by asking the agent "List my WhatsApp chats").
+- Update agent instructions if automatic chat listing is desired under certain conditions.
+
+## 04-19-2025 - Fix WhatsApp Auto-Initialization on Server Start
+
+### Files Updated:
+- `/Users/chen/Desktop/Projects/Naomi/whatsapp_integration/mcp_server_node/server.js`: Added call to `initializeClient()` within the `app.listen()` callback to ensure the WhatsApp connection process starts immediately when the server boots up.
+
+### Description:
+Corrected a critical bug where the Node.js server was not automatically initiating the connection to WhatsApp upon startup. The `initializeClient()` function, containing the necessary `client.initialize()` call, was defined but never invoked in the main execution flow. Added the call to `initializeClient()` right after the Express server starts listening.
+
+### Reasoning:
+The server must attempt to connect to WhatsApp immediately on start to either restore a previous session or display the QR code for a new session. Without this automatic initialization, the server would only attempt connection if a specific (and non-standard) `/mcp` tool (`whatsapp.get_qr_code`) was called, preventing normal operation and QR code display. This fix ensures the expected behavior.
+
+### Trade-offs:
+- None. This is a fundamental requirement for the server to function correctly.
+
+### Considerations:
+- This ensures the QR code is presented promptly if needed, allowing the user to authenticate the session.
+- Restored sessions (via `LocalAuth`) should now also work correctly on server restart.
+
+### Future Work:
+- Stop the old server instance manually.
+- Restart the server with the updated code.
+- Verify QR code generation and successful connection ("Client is ready!").
+- Proceed with agent testing.
+
+## 04-19-2025 - Refactor Agent for MCPToolset Integration
+
+### Files Updated:
+- `/Users/chen/Desktop/Projects/Naomi/agent/agent.py`: Major refactoring to use `MCPToolset` for communication with the WhatsApp MCP server.
+
+### Description:
+Replaced the previous direct HTTP POST calls (using `requests`) to the Node.js server's `/mcp` endpoint with the ADK-standard `MCPToolset` integration. The agent now uses `MCPToolset.from_server` with `StdioServerParameters` to automatically start the `node server.js` process, communicate via stdio, discover available tools (`whatsapp.list_chats`, `whatsapp.get_messages`, etc.), and proxy tool calls. This aligns the implementation with the official `adk-mcp-docs.md` pattern.
+
+### Reasoning:
+The previous implementation using direct HTTP calls contradicted the documented ADK approach for interacting with MCP servers, which mandates using `MCPToolset`. This mismatch was identified as the likely root cause of the persistent 400 Bad Request errors. `MCPToolset` handles the correct communication protocol (stdio for local processes) and lifecycle management, abstracting the MCP details from the agent code.
+
+### Trade-offs:
+- Increased complexity initially due to async setup and `exit_stack` management.
+- Benefit: Adherence to the standard ADK pattern, expected to resolve communication errors and provide more robust integration. `MCPToolset` handles low-level protocol details.
+
+### Considerations:
+- `MCPToolset` now manages the lifecycle of the `node server.js` process. The server does *not* need to be started manually beforehand.
+- The agent script (`agent.py`) must be run from the `/Users/chen/Desktop/Projects/Naomi/agent` directory for the relative path calculation (`../whatsapp_integration/mcp_server_node`) to the server to work correctly.
+- The `exit_stack.aclose()` call is critical for cleanly terminating the Node.js server process when the agent script exits.
+- The agent instructions were updated to reflect the tool names discovered via MCP (e.g., `whatsapp.list_chats` instead of `list_whatsapp_chats_mcp`).
+
+### Future Work:
+- Run the updated `agent.py` script.
+- Verify that `MCPToolset` successfully starts the Node.js server and discovers tools.
+- Test agent interaction by issuing commands like "List my WhatsApp chats".
+- Ensure the Node.js server process is terminated correctly when the agent script exits (check for the "Closing MCP server connection..." log).

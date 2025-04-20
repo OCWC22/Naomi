@@ -1,2 +1,5 @@
 google-adk
+python-dotenv
+composio_openai
 fastapi
+requests

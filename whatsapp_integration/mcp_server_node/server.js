@@ -426,9 +426,9 @@ app.get('/', (req, res) => {
 // --- Server Start --- 
 app.listen(PORT, () => {
     console.log(`WhatsApp MCP Server listening on port ${PORT}`);
-    // Try initial connection on server start - crucial for QR code generation
-    initializeClient(); 
-    console.log("Server started. Attempting to initialize WhatsApp client.");
+    // --- Start WhatsApp Initialization ---
+    initializeClient(); // <<< Ensure WhatsApp connection attempts start
+    console.log("Server started. WhatsApp connection initialization started.");
     console.log("Monitor console for QR code or authentication status.");
     console.log("Session data will be stored in ./wweb_session/");
 });
