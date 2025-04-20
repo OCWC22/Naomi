@@ -325,6 +325,52 @@ app.post('/mcp', async (req, res) => { // Make handler async for await
             });
         }
     }
+    // --- Tool: whatsapp.list_chats --- 
+    else if (tool_name === 'whatsapp.list_chats') {
+        if (!clientReady) {
+            console.log("Tool Call [list_chats]: Client not ready.");
+            return res.status(400).json({
+                output: null,
+                error: { message: "WhatsApp client is not ready. Please ensure it's authenticated and initialized." }
+            });
+        }
+
+        try {
+            console.log("Tool Call [list_chats]: Attempting to fetch chats...");
+            const chats = await client.getChats();
+
+            if (!chats || chats.length === 0) {
+                console.log("Tool Call [list_chats]: No chats found or client hasn't synced chats yet.");
+                 return res.status(404).json({
+                    output: null,
+                    error: { message: "No chats found. This might happen if the client just connected or has no chats." }
+                });
+            }
+
+            // Format chats for output (include name and ID)
+            // Filter out chats without names (sometimes happens with system messages/contacts)
+            const formattedChats = chats
+                .filter(chat => chat.name) // Only include chats with a name
+                .map(chat => ({
+                    id: chat.id._serialized, // The crucial chatId (e.g., number@c.us or group@g.us)
+                    name: chat.name,          // Contact or Group name
+                    isGroup: chat.isGroup     // Boolean indicating if it's a group
+                    // Add other fields if needed: chat.unreadCount, chat.timestamp (last activity)
+                }));
+
+            console.log(`Tool Call [list_chats]: Successfully fetched ${formattedChats.length} chats.`);
+            res.status(200).json({
+                output: { chats: formattedChats }
+            });
+
+        } catch (error) {
+            console.error(`Tool Call [list_chats]: Error fetching chats:`, error);
+            res.status(500).json({
+                output: null,
+                error: { message: `Failed to fetch chats: ${error.message}`, details: error.stack }
+            });
+        }
+    }
     // --- Tool: whatsapp.logout ---
     else if (tool_name === 'whatsapp.logout') {
          if (!isAuthenticated && !clientReady) {
@@ -365,6 +411,7 @@ app.get('/', (req, res) => {
         'whatsapp.check_auth_status',
         'whatsapp.send_message',
         'whatsapp.get_messages', // Added recently
+        'whatsapp.list_chats', // Added recently
         'whatsapp.logout'       // Make sure to include all tools you have handlers for
         // Add any other tool names here as you implement them
     ];
