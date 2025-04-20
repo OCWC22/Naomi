@@ -10,7 +10,7 @@ def get_whatsapp_conversation(person_name: str) -> dict:
     Returns:
         dict: status and result or error msg.
     """
-    if person_name.lower() == "Lucy":
+    if person_name.lower() == "lucy":
         return {
             "status": "success",
             "history": [
@@ -20,7 +20,7 @@ def get_whatsapp_conversation(person_name: str) -> dict:
                 ["10:34 AM", "Lucy", "You never took it out"],
             ]
         }
-    elif person_name.lower() == "Suzy":
+    elif person_name.lower() == "suzy":
         return {
             "status": "success",
             "history": [
