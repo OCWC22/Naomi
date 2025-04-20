@@ -40,7 +40,7 @@ def get_whatsapp_conversation(person_name: str) -> dict:
 
 root_agent = Agent(
     name="conversation_debugger_agent",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     description=(
         "Agent to analyze conversation between a couple and generate insights."
     ),
