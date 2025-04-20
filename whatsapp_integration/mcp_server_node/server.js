@@ -255,6 +255,76 @@ app.post('/mcp', async (req, res) => { // Make handler async for await
             });
         }
     }
+    // --- Tool: whatsapp.get_messages ---
+    else if (tool_name === 'whatsapp.get_messages') {
+        if (!clientReady) {
+            console.log("Tool Call [get_messages]: Client not ready.");
+            return res.status(400).json({
+                output: null,
+                error: { message: "WhatsApp client is not ready. Please ensure it's authenticated and initialized." }
+            });
+        }
+
+        const { chatId, limit } = input || {}; // Extract chatId and optional limit from input
+
+        if (!chatId) {
+            console.log("Tool Call [get_messages]: Missing chatId input.");
+            return res.status(400).json({
+                output: null,
+                error: { message: "Missing 'chatId' in tool input." }
+            });
+        }
+
+        const messageLimit = parseInt(limit) || 20; // Default to 20 messages if limit is not provided or invalid
+
+        try {
+            console.log(`Tool Call [get_messages]: Attempting to fetch ${messageLimit} messages for chat ${chatId}...`);
+            const chat = await client.getChatById(chatId);
+            if (!chat) {
+                 console.log(`Tool Call [get_messages]: Chat not found for ID ${chatId}.`);
+                 return res.status(404).json({
+                    output: null,
+                    error: { message: `Chat with ID '${chatId}' not found.` }
+                });
+            }
+
+            const messages = await chat.fetchMessages({ limit: messageLimit });
+
+            // Format messages for the output
+            const formattedMessages = messages.map(msg => ({
+                id: msg.id._serialized, // Unique message ID
+                timestamp: msg.timestamp, // Unix timestamp
+                from: msg.from,         // Sender ID (e.g., number@c.us or group@g.us for group messages)
+                to: msg.to,             // Recipient ID (your number@c.us or group@g.us)
+                author: msg.author,     // Specific author ID within a group (if applicable)
+                body: msg.body,         // Message content
+                ack: msg.ack,           // Acknowledgement status (-1: error, 0: pending, 1: sent, 2: received, 3: read, 4: played)
+                hasMedia: msg.hasMedia, // Boolean indicating if media is attached
+                type: msg.type          // e.g., 'chat', 'image', 'video', 'sticker', 'ptt' (push-to-talk)
+                // Add other fields as needed, e.g., msg.isStatus, msg.isGif
+            }));
+
+            console.log(`Tool Call [get_messages]: Successfully fetched ${formattedMessages.length} messages for chat ${chatId}.`);
+            res.status(200).json({
+                output: { messages: formattedMessages }
+            });
+
+        } catch (error) {
+            console.error(`Tool Call [get_messages]: Error fetching messages for chat ${chatId}:`, error);
+            // Try to provide a more specific error message if possible
+            let errorMessage = "Failed to fetch messages.";
+            if (error.message && error.message.includes('Chat not found')) {
+                 errorMessage = `Chat with ID '${chatId}' not found or inaccessible.`;
+                 return res.status(404).json({ output: null, error: { message: errorMessage }});
+            } else if (error.message) {
+                errorMessage = `Error: ${error.message}`;
+            }
+            res.status(500).json({
+                output: null,
+                error: { message: errorMessage, details: error.stack } // Include stack in dev/debug?
+            });
+        }
+    }
     // --- Tool: whatsapp.logout ---
     else if (tool_name === 'whatsapp.logout') {
          if (!isAuthenticated && !clientReady) {
@@ -284,6 +354,26 @@ app.post('/mcp', async (req, res) => { // Make handler async for await
             error: { message: `Tool '${tool_name}' not found.` }
         });
     }
+});
+
+// --- Root Endpoint for Status Check ---
+app.get('/', (req, res) => {
+    console.log("Received GET request on root path '/'");
+    // Define the list of available tool names
+    const availableTools = [
+        'whatsapp.get_qr_code',
+        'whatsapp.check_auth_status',
+        'whatsapp.send_message',
+        'whatsapp.get_messages', // Added recently
+        'whatsapp.logout'       // Make sure to include all tools you have handlers for
+        // Add any other tool names here as you implement them
+    ];
+    res.status(200).json({
+        status: 'running',
+        message: 'WhatsApp MCP Server is active. Use POST /mcp for tool calls.',
+        timestamp: new Date().toISOString(), // Add a timestamp for freshness
+        available_tools: availableTools // Include the list in the response
+    });
 });
 
 // --- Server Start --- 
